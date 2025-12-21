@@ -10,6 +10,9 @@ pipeline {
 
     stages {
         stage('Static Analysis') {
+            tools {
+                nodejs 'nodejs'
+            }
             steps {
                 // 此階段必須在所有分支執行 
                 echo 'Running ESLint...'
