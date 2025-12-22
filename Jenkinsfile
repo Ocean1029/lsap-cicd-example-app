@@ -1,7 +1,5 @@
 pipeline {
     agent any
-    
-    // 這裡定義全域環境變數，方便後續 ChatOps 使用
     environment {
         MY_NAME = "曾煥軒"
         STUDENT_ID = "B12705002"
@@ -11,11 +9,8 @@ pipeline {
 
     stages {
         stage('Static Analysis') {
-            tools {
-                nodejs 'nodejs'
-            }
+            tools { nodejs 'nodejs' }
             steps {
-                // 此階段必須在所有分支執行 
                 echo 'Running ESLint...'
                 sh 'npm install'
                 sh 'npm run lint'
@@ -25,28 +20,53 @@ pipeline {
         stage('Staging Deployment') {
             when { branch 'dev' }
             steps {
-                // 必須使用 script 區塊才能定義變數與執行複雜邏輯
                 script {
                     def imageTag = "dev-${env.BUILD_NUMBER}"
-                    def fullImageName = "${env.DOCKER_HUB_USER}/${env.REPO_NAME}:${imageTag}"
-                    
-                    // 使用 withCredentials 綁定帳號密碼至環境變數
+                    def fullImageName = "" 
+
                     withCredentials([usernamePassword(credentialsId: 'ae58b061-6e5f-4b57-a94e-422fd6da1699', 
                                                     passwordVariable: 'DOCKER_PASSWORD', 
                                                     usernameVariable: 'DOCKER_USERNAME')]) {
                         
-                        // 執行 Docker Build 與 Push
+                        fullImageName = "${DOCKER_USERNAME}/${env.REPO_NAME}:${imageTag}"
+                        
                         sh "docker build -t ${fullImageName} ."
                         sh "echo \$DOCKER_PASSWORD | docker login -u \$DOCKER_USERNAME --password-stdin"
                         sh "docker push ${fullImageName}"
                     }
 
-                    // Cleanup 與 Deploy
                     sh "docker rm -f dev-app || true"
                     sh "docker run -d --name dev-app -p 8081:3000 ${fullImageName}"
-
-                    // 健康檢查驗證
                     sh "sleep 5 && curl -f http://localhost:8081/health"
+                }
+            }
+        }
+
+        stage('Production Promotion (GitOps)') {
+            when { branch 'main' }
+            steps {
+                script {
+                    // 1. 讀取配置：從 deploy.config 讀取目標標籤 
+                    def TARGET_TAG = readFile('deploy.config').trim()
+                    def prodTag = "prod-${env.BUILD_NUMBER}"
+                    def promotedImage = ""
+
+                    withCredentials([usernamePassword(credentialsId: 'ae58b061-6e5f-4b57-a94e-422fd6da1699', 
+                                                    passwordVariable: 'DOCKER_PASSWORD', 
+                                                    usernameVariable: 'DOCKER_USERNAME')]) {
+                        
+                        def sourceImage = "${DOCKER_USERNAME}/${env.REPO_NAME}:${TARGET_TAG}"
+                        promotedImage = "${DOCKER_USERNAME}/${env.REPO_NAME}:${prodTag}"
+
+                        // 2. 映像檔晉升：拉取舊標籤、重標記、推送新標籤 [cite: 60, 61, 62]
+                        sh "docker pull ${sourceImage}"
+                        sh "docker tag ${sourceImage} ${promotedImage}"
+                        sh "docker push ${promotedImage}"
+                    }
+
+                    // 3. 部署：清理舊容器並在 8082 啟動 [cite: 63, 64, 66]
+                    sh "docker rm -f prod-app || true"
+                    sh "docker run -d --name prod-app -p 8082:3000 ${promotedImage}"
                 }
             }
         }
@@ -54,7 +74,6 @@ pipeline {
 
     post {
         failure {
-            // 當 Pipeline 失敗時，發送 ChatOps 通知
             script {
                 sh """
                 curl -H "Content-Type: application/json" \
@@ -62,9 +81,9 @@ pipeline {
                 -d '{
                     "content": "❌ **Build Failed!**\\n**Name:** ${env.MY_NAME}\\n**ID:** ${env.STUDENT_ID}\\n**Job:** ${env.JOB_NAME}\\n**Build:** # ${env.BUILD_NUMBER}\\n**Repo:** ${env.GIT_URL}\\n**Branch:** ${env.BRANCH_NAME}\\n**Status:** ${currentBuild.currentResult}"
                 }' \
-                ${DISCORD_WEBHOOK}
+                ${env.DISCORD_WEBHOOK}
                 """
-            }
+            } 
         }
     }
 }
