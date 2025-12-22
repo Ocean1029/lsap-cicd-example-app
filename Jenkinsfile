@@ -58,7 +58,7 @@ pipeline {
                         def sourceImage = "${DOCKER_USERNAME}/${env.REPO_NAME}:${TARGET_TAG}"
                         promotedImage = "${DOCKER_USERNAME}/${env.REPO_NAME}:${prodTag}"
 
-                        // 2. 映像檔晉升：拉取舊標籤、重標記、推送新標籤 [cite: 60, 61, 62]
+                        // 2. 映像檔晉升：拉取舊標籤、重標記、推送新標籤 
                         sh "docker pull ${sourceImage}"
                         sh "docker tag ${sourceImage} ${promotedImage}"
                         sh "docker push ${promotedImage}"
