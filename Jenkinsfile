@@ -67,6 +67,7 @@ pipeline {
                     // 3. 部署：清理舊容器並在 8082 啟動 [cite: 63, 64, 66]
                     sh "docker rm -f prod-app || true"
                     sh "docker run -d --name prod-app -p 8082:3000 ${promotedImage}"
+                    sh "sleep 5 && curl -f http://host.docker.internal:8082"
                 }
             }
         }
