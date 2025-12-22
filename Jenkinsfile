@@ -37,7 +37,7 @@ pipeline {
 
                     sh "docker rm -f dev-app || true"
                     sh "docker run -d --name dev-app -p 8081:3000 ${fullImageName}"
-                    sh "sleep 5 && curl -f http://localhost:8081/health"
+                    sh "sleep 5 && curl -f http://host.docker.internal:8081/health"
                 }
             }
         }
