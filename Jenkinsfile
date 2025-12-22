@@ -7,9 +7,10 @@ pipeline {
         REPO_NAME = "lsap-cicd-example-app"
     }
 
+    tools { nodejs 'nodejs' }
+
     stages {
         stage('Static Analysis') {
-            tools { nodejs 'nodejs' }
             steps {
                 echo 'Running ESLint...'
                 sh 'npm install'
