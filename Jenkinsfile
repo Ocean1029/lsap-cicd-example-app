@@ -21,6 +21,9 @@ pipeline {
             when { branch 'dev' }
             steps {
                 script {
+                    // 取得 package.json 中的 version 
+                    def packageVersion = sh(script: "node -p \"require('./package.json').version\"", returnStdout: true).trim()
+
                     def imageTag = "dev-${env.BUILD_NUMBER}"
                     def semanticTag = "v${packageVersion}"
                     def fullImageName = "" 
