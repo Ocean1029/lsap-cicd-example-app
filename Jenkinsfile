@@ -27,22 +27,26 @@ pipeline {
 
                     def imageTag = "dev-${env.BUILD_NUMBER}"
                     def semanticTag = "v${packageVersion}"
-                    def fullImageName = "" 
 
                     withCredentials([usernamePassword(credentialsId: 'ae58b061-6e5f-4b57-a94e-422fd6da1699', 
                                                     passwordVariable: 'DOCKER_PASSWORD', 
                                                     usernameVariable: 'DOCKER_USERNAME')]) {
                         
-                        fullImageName = "${DOCKER_USERNAME}/${env.REPO_NAME}:${imageTag} ${semanticTag}"
+                        // 定義兩個完整的映像名稱
+                        def buildTag = "${DOCKER_USERNAME}/${env.REPO_NAME}:${imageTag}"
+                        def semanticImageName = "${DOCKER_USERNAME}/${env.REPO_NAME}:${semanticTag}"
                         
-                        sh "docker build -t ${fullImageName} ."
+                        // 使用 -t 參數同時建立兩個標籤
+                        sh "docker build -t ${buildTag} -t ${semanticImageName} ."
                         sh "echo \$DOCKER_PASSWORD | docker login -u \$DOCKER_USERNAME --password-stdin"
-                        sh "docker push ${fullImageName}"
+                        sh "docker push ${buildTag}"
+                        sh "docker push ${semanticImageName}"
+                        
+                        // 部署容器（docker run 不需要認證，所以可以放在這裡）
+                        sh "docker rm -f dev-app || true"
+                        sh "docker run -d --name dev-app -p 8081:3000 ${buildTag}"
+                        sh "sleep 5 && curl -f http://host.docker.internal:8081"
                     }
-
-                    sh "docker rm -f dev-app || true"
-                    sh "docker run -d --name dev-app -p 8081:3000 ${fullImageName}"
-                    sh "sleep 5 && curl -f http://host.docker.internal:8081"
                 }
             }
         }
@@ -54,25 +58,24 @@ pipeline {
                     // 1. 讀取配置：從 deploy.config 讀取目標標籤 
                     def TARGET_TAG = readFile('deploy.config').trim()
                     def prodTag = "prod-${env.BUILD_NUMBER}"
-                    def promotedImage = ""
 
                     withCredentials([usernamePassword(credentialsId: 'ae58b061-6e5f-4b57-a94e-422fd6da1699', 
                                                     passwordVariable: 'DOCKER_PASSWORD', 
                                                     usernameVariable: 'DOCKER_USERNAME')]) {
                         
                         def sourceImage = "${DOCKER_USERNAME}/${env.REPO_NAME}:${TARGET_TAG}"
-                        promotedImage = "${DOCKER_USERNAME}/${env.REPO_NAME}:${prodTag}"
+                        def promotedImage = "${DOCKER_USERNAME}/${env.REPO_NAME}:${prodTag}"
 
                         // 2. 映像檔晉升：拉取舊標籤、重標記、推送新標籤 
                         sh "docker pull ${sourceImage}"
                         sh "docker tag ${sourceImage} ${promotedImage}"
                         sh "docker push ${promotedImage}"
+                        
+                        // 3. 部署：清理舊容器並在 8082 啟動
+                        sh "docker rm -f prod-app || true"
+                        sh "docker run -d --name prod-app -p 8082:3000 ${promotedImage}"
+                        sh "sleep 5 && curl -f http://host.docker.internal:8082"
                     }
-
-                    // 3. 部署：清理舊容器並在 8082 啟動 [cite: 63, 64, 66]
-                    sh "docker rm -f prod-app || true"
-                    sh "docker run -d --name prod-app -p 8082:3000 ${promotedImage}"
-                    sh "sleep 5 && curl -f http://host.docker.internal:8082"
                 }
             }
         }
