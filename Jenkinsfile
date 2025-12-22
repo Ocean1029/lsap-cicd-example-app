@@ -20,6 +20,25 @@ pipeline {
                 sh 'npm run lint'
             }
         }
+
+        stage('Staging Deployment') {
+        when { branch 'dev' }
+        steps {
+            script {
+                def imageTag = "dev-${env.BUILD_NUMBER}"
+                def fullImageName = "${DOCKER_HUB_USER}/${REPO_NAME}:${imageTag}"
+                
+                docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-login') {
+                    def customImage = docker.build(fullImageName)
+                    customImage.push("v1.1.0") 
+                }
+
+                sh "docker rm -f dev-app || true"
+                sh "docker run -d --name dev-app -p 8081:3000 ${fullImageName}"
+                sh "sleep 5 && curl -f http://localhost:8081/health"
+            }
+        }
+    }
     }
 
     post {
