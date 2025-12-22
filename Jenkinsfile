@@ -22,13 +22,14 @@ pipeline {
             steps {
                 script {
                     def imageTag = "dev-${env.BUILD_NUMBER}"
+                    def semanticTag = "v${packageVersion}"
                     def fullImageName = "" 
 
                     withCredentials([usernamePassword(credentialsId: 'ae58b061-6e5f-4b57-a94e-422fd6da1699', 
                                                     passwordVariable: 'DOCKER_PASSWORD', 
                                                     usernameVariable: 'DOCKER_USERNAME')]) {
                         
-                        fullImageName = "${DOCKER_USERNAME}/${env.REPO_NAME}:${imageTag}"
+                        fullImageName = "${DOCKER_USERNAME}/${env.REPO_NAME}:${imageTag} ${semanticTag}"
                         
                         sh "docker build -t ${fullImageName} ."
                         sh "echo \$DOCKER_PASSWORD | docker login -u \$DOCKER_USERNAME --password-stdin"
