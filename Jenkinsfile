@@ -6,6 +6,8 @@ pipeline {
         MY_NAME = "曾煥軒"
         STUDENT_ID = "B12705002"
         DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1452002798479610049/4QzrPJPQ2DEvT-wg1Cjg66CZ76vE5xjlc5xs2ukvUEroFGW9H2Oo3K9Tb2JBsizoaXZl"
+        DOCKER_HUB_USER = "ocean1029"
+        REPO_NAME = "lsap-cicd-example-app"
     }
 
     stages {
